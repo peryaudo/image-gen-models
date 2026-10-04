@@ -1,0 +1,39 @@
+run_name: vae_cifar10
+out_dir: runs
+seed: 0
+
+data:
+  dataset: cifar10
+  resolution: 32
+  hflip: true
+  num_workers: 8
+
+model:
+  in_channels: 3
+  resolution: ${data.resolution}
+  channels: [64, 128, 256, 512]  # one entry per level; 32 -> 16 -> 8 -> 4
+  latent_dim: 128
+
+loss:
+  beta: 1.0  # weight on KL; 1.0 = the true ELBO
+
+train:
+  batch_size: 128
+  max_steps: 50000
+  lr: 5.0e-4
+  betas: [0.9, 0.999]
+  grad_clip: null  # null = no clipping (grad norm is still logged)
+  resume: true  # continue from runs/<run_name>/last.pt if it exists
+  overfit_batch: false  # smoke test: train on a single repeated batch
+  log_every: 100
+  sample_every: 2500
+  ckpt_every: 5000
+
+sample:
+  n: 64  # 8x8 grid of prior samples
+  n_recon: 32  # reconstructions shown as 4 real/recon row pairs
+  seed: 1234
+
+wandb:
+  entity: peryaudo
+  project: image-gen-models

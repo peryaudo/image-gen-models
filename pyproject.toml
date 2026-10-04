@@ -1,0 +1,27 @@
+[project]
+name = "image-gen-models"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=5.0.1",
+    "matplotlib>=3.11.2",
+    "omegaconf>=2.3.1",
+    "pyyaml>=6.0.3",
+    "torch>=2.14.1",
+    "torch-fidelity>=0.4.0",
+    "torchvision>=0.29.1",
+    "tqdm>=4.70.1",
+    "wandb>=0.30.0",
+]
+
+[tool.uv]
+# Never use the system Python: Debian's dist-packages (old SciPy) breaks NumPy 2.x.
+python-preference = "only-managed"
+
+[tool.ruff]
+line-length = 100
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.10",
+]
