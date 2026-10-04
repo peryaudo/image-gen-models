@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_response.filePath // .tool_input.file_path // empty'); case \"$f\" in *.py) ;; *) exit 0;; esac; cd \"$CLAUDE_PROJECT_DIR\" || exit 0; uv run --quiet ruff check --fix --quiet \"$f\" >&2 || { uv run --quiet ruff format --quiet \"$f\"; exit 2; }; uv run --quiet ruff format --quiet \"$f\"",
+            "timeout": 60,
+            "statusMessage": "ruff check --fix + format"
+          }
+        ]
+      }
+    ]
+  }
+}
