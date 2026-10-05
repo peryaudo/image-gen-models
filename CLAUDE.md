@@ -34,7 +34,7 @@ Implementation order is fixed: **VAE -> flow matching -> GAN -> DDPM**. Do not s
 | Dataset | HF repo | Resolution used | Notes |
 |---|---|---|---|
 | CIFAR-10 | `uoft-cs/cifar10` | 32x32 | Image column is `img`, plus `label`. Main benchmark. |
-| Anime faces | `huggan/anime-faces` | 64x64 | Image column is `image`. About 21k images. |
+| Anime faces | `huggan/anime-faces` | 64x64 | Image column is `image`. 17,029 unique images after dedup (the repo loads as 86,204 rows: `images/` and `data.zip` are copies, and the originals contain duplicates). `src/data.py` drops the zip rows and pixel-identical duplicates. |
 | Flowers-102 | `huggan/flowers-102-categories` | 64x64 | Image column is `image`, plus `label`. Varying native sizes, so resize + center crop. |
 
 Rules:
