@@ -25,3 +25,7 @@ line-length = 100
 dev = [
     "ruff>=0.16.10",
 ]
+
+[tool.ruff.lint.isort]
+# The local wandb/ run directory would otherwise make ruff classify `import wandb` as first-party.
+known-third-party = ["wandb"]

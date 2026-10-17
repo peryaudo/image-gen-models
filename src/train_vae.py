@@ -156,6 +156,7 @@ def main(cfg: DictConfig) -> None:
 
         if step % cfg.train.ckpt_every == 0 or step == cfg.train.max_steps:
             state = {
+                "kind": "vae",  # tells src/sample.py which model class to rebuild
                 "model": model.state_dict(),
                 "ema": None,  # the VAE spec uses no EMA; key kept for a uniform checkpoint format
                 "optimizer": opt.state_dict(),
