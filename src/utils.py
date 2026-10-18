@@ -61,3 +61,23 @@ def save_checkpoint(path: Path, state: dict) -> None:
 
 def load_checkpoint(path: Path) -> dict:
     return torch.load(path, map_location="cpu", weights_only=False)
+
+
+@torch.no_grad()
+def ema_update(
+    ema_model: torch.nn.Module, model: torch.nn.Module, decay: float, step: int
+) -> float:
+    """Exponential moving average of the weights: ema <- decay * ema + (1 - decay) * model.
+
+    The averaged weights smooth out the noise of individual SGD steps, which matters a lot for
+    diffusion / flow samples. A fixed decay of 0.9999 averages over the last ~10k steps, so
+    early in training the EMA would still be mostly random init; the warmup
+    min(decay, (1 + step) / (10 + step)) ramps it up (0.999 at ~10k steps, 0.9999 at ~100k).
+    Returns the decay actually used, for logging.
+    """
+    d = min(decay, (1 + step) / (10 + step))
+    for p_ema, p in zip(ema_model.parameters(), model.parameters()):
+        p_ema.lerp_(p, 1 - d)
+    for b_ema, b in zip(ema_model.buffers(), model.buffers()):
+        b_ema.copy_(b)
+    return d

@@ -1,0 +1,44 @@
+run_name: fm_cifar10
+out_dir: runs
+seed: 0
+
+data:
+  dataset: cifar10
+  resolution: 32
+  hflip: true
+  num_workers: 8
+
+# Shared U-Net (src/models/unet.py). DDPM must use this exact block for a fair comparison.
+# This is the DDPM paper's CIFAR-10 network (~35.7M params).
+model:
+  in_channels: 3
+  resolution: ${data.resolution}
+  base_channels: 128
+  channel_mult: [1, 2, 2, 2]  # one entry per level; 32 -> 16 -> 8 -> 4
+  num_res_blocks: 2
+  attn_resolutions: [16]
+  dropout: 0.1
+  time_scale: 1000.0  # t in [0, 1] -> [0, 1000] for the sinusoidal embedding
+
+train:
+  batch_size: 128
+  max_steps: 100000
+  lr: 2.0e-4
+  betas: [0.9, 0.999]
+  warmup_steps: 5000  # linear lr warmup from 0
+  grad_clip: 1.0
+  ema_decay: 0.9999
+  resume: true  # continue from runs/<run_name>/last.pt if it exists
+  overfit_batch: false  # smoke test: train on a single repeated batch
+  log_every: 100
+  sample_every: 5000
+  ckpt_every: 5000
+
+sample:
+  n: 64  # 8x8 grid
+  steps: [10, 20, 50]  # Euler step counts shown in each periodic grid (50 is the default)
+  seed: 1234
+
+wandb:
+  entity: peryaudo
+  project: image-gen-models

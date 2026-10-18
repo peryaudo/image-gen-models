@@ -5,21 +5,26 @@ plus its NFE (network function evaluations per image), the unit of sampling cost
 a VAE needs 1 decoder pass, an ODE/SDE sampler needs one U-Net pass per step.
 
 Run:  uv run python -m src.sample --ckpt runs/vae_cifar10/last.pt --n 64
+      uv run python -m src.sample --ckpt runs/fm_cifar10/last.pt --n 64 --steps 50
 """
 
 import argparse
 from collections.abc import Callable, Iterator
+from itertools import pairwise
 from pathlib import Path
 
 import torch
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
+from src.models.unet import UNet
 from src.models.vae import VAE
 from src.utils import load_checkpoint, save_grid, to_unit
 
 # kind -> model class; the checkpoint's "kind" key picks the entry.
-MODELS: dict[str, type[nn.Module]] = {"vae": VAE}
+MODELS: dict[str, type[nn.Module]] = {"vae": VAE, "fm": UNet}
+
+FM_DEFAULT_STEPS = 50  # Euler steps when none are given (the spec's default)
 
 
 @torch.no_grad()
@@ -32,8 +37,35 @@ def sample_vae(
     return to_unit(model.decode(z.to(device))), 1
 
 
+@torch.no_grad()
+def euler_ode(model: UNet, x1: torch.Tensor, steps: int) -> torch.Tensor:
+    """Integrate the learned flow dx/dt = v(x, t) from noise (t = 1) back to data (t = 0).
+
+    Euler's method takes `steps` equal steps of size dt = -1/steps:
+        x_{t + dt} = x_t + dt * v(x_t, t)
+    If the learned paths were perfectly straight, a single step would be exact; curvature is
+    what makes few-step sampling lose quality.
+    """
+    ts = torch.linspace(1.0, 0.0, steps + 1, device=x1.device)
+    x = x1
+    for t, t_next in pairwise(ts):
+        x = x + (t_next - t) * model(x, t.expand(x.shape[0]))
+    return x
+
+
+@torch.no_grad()
+def sample_fm(
+    model: UNet, n: int, generator: torch.Generator, steps: int | None
+) -> tuple[torch.Tensor, int]:
+    """Euler ODE sampling from x1 ~ N(0, I). One U-Net pass per step, so NFE = steps."""
+    steps = steps or FM_DEFAULT_STEPS
+    shape = (n, model.in_channels, model.resolution, model.resolution)
+    x1 = torch.randn(shape, generator=generator).to(next(model.parameters()).device)
+    return to_unit(euler_ode(model, x1, steps)), steps
+
+
 Sampler = Callable[[nn.Module, int, torch.Generator, int | None], tuple[torch.Tensor, int]]
-SAMPLERS: dict[str, Sampler] = {"vae": sample_vae}
+SAMPLERS: dict[str, Sampler] = {"vae": sample_vae, "fm": sample_fm}
 
 
 def load_model(ckpt_path: Path, device: torch.device) -> tuple[str, nn.Module, DictConfig, int]:
