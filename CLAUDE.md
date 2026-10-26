@@ -174,7 +174,7 @@ uv run python -m src.eval_fid --ckpt runs/fm_cifar10/last.pt --n 10000
 - [x] `src/data.py` loads all three datasets and shows a sample grid
 - [x] VAE trains on CIFAR-10 and produces samples + reconstructions
 - [x] Flow matching trains on CIFAR-10 and produces samples (Euler, 50 steps)
-- [ ] GAN trains on CIFAR-10 (document the stabilization steps)
+- [x] GAN trains on CIFAR-10 (document the stabilization steps)
 - [ ] DDPM trains on CIFAR-10 with DDPM and DDIM sampling
 - [x] FID evaluation script shared by all models
 - [ ] Repeat on anime-faces and flowers-102 at 64x64

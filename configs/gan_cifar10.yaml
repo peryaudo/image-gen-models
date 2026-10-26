@@ -1,0 +1,49 @@
+run_name: gan_cifar10
+out_dir: runs
+seed: 0
+
+data:
+  dataset: cifar10
+  resolution: 32
+  hflip: true
+  num_workers: 8
+
+# Generator (src/models/gan.py). Kept under `model` so src/sample.py rebuilds it like the others.
+# 2x the width of the spectral norm paper's "standard CNN": ~13.1M params.
+model:
+  img_channels: 3
+  resolution: ${data.resolution}
+  latent_dim: 128
+  channels: [1024, 512, 256, 128]  # one entry per level; 4 -> 8 -> 16 -> 32
+
+# ~11.7M params. The stabilizer ablation (README) flips these and `loss`, one at a time.
+discriminator:
+  img_channels: 3
+  resolution: ${data.resolution}
+  channels: [128, 256, 512, 1024]  # one entry per level; 32 -> 16 -> 8 -> 4
+  norm: none  # batchnorm (DCGAN baseline) | none
+  spectral_norm: true
+
+loss:
+  generator: nonsaturating  # saturating (original minimax) | nonsaturating
+  r1_gamma: 0.1  # weight of the R1 penalty on D's gradient at real images; 0 = off
+
+train:
+  batch_size: 128
+  max_steps: 100000  # generator steps (one D step per G step)
+  lr_g: 2.0e-4
+  lr_d: 2.0e-4
+  betas: [0.5, 0.999]
+  resume: true  # continue from runs/<run_name>/last.pt if it exists
+  overfit_batch: false  # smoke test: train on a single repeated batch
+  log_every: 100
+  sample_every: 1000  # frequent: mode collapse shows up in the grids before the loss
+  ckpt_every: 5000
+
+sample:
+  n: 64  # 8x8 grid
+  seed: 1234
+
+wandb:
+  entity: peryaudo
+  project: image-gen-models

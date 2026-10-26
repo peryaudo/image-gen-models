@@ -6,6 +6,7 @@ a VAE needs 1 decoder pass, an ODE/SDE sampler needs one U-Net pass per step.
 
 Run:  uv run python -m src.sample --ckpt runs/vae_cifar10/last.pt --n 64
       uv run python -m src.sample --ckpt runs/fm_cifar10/last.pt --n 64 --steps 50
+      uv run python -m src.sample --ckpt runs/gan_cifar10/last.pt --n 64
 """
 
 import argparse
@@ -17,12 +18,13 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from torch import nn
 
+from src.models.gan import Generator
 from src.models.unet import UNet
 from src.models.vae import VAE
 from src.utils import load_checkpoint, save_grid, to_unit
 
 # kind -> model class; the checkpoint's "kind" key picks the entry.
-MODELS: dict[str, type[nn.Module]] = {"vae": VAE, "fm": UNet}
+MODELS: dict[str, type[nn.Module]] = {"vae": VAE, "fm": UNet, "gan": Generator}
 
 FM_DEFAULT_STEPS = 50  # Euler steps when none are given (the spec's default)
 
@@ -35,6 +37,16 @@ def sample_vae(
     z = torch.randn(n, model.latent_dim, generator=generator)
     device = next(model.parameters()).device
     return to_unit(model.decode(z.to(device))), 1
+
+
+@torch.no_grad()
+def sample_gan(
+    model: Generator, n: int, generator: torch.Generator, steps: int | None
+) -> tuple[torch.Tensor, int]:
+    """Map z ~ N(0, I) through the generator. One forward pass, so NFE = 1 (`steps` is unused)."""
+    z = torch.randn(n, model.latent_dim, generator=generator)
+    device = next(model.parameters()).device
+    return to_unit(model(z.to(device))), 1
 
 
 @torch.no_grad()
@@ -65,7 +77,7 @@ def sample_fm(
 
 
 Sampler = Callable[[nn.Module, int, torch.Generator, int | None], tuple[torch.Tensor, int]]
-SAMPLERS: dict[str, Sampler] = {"vae": sample_vae, "fm": sample_fm}
+SAMPLERS: dict[str, Sampler] = {"vae": sample_vae, "fm": sample_fm, "gan": sample_gan}
 
 
 def load_model(ckpt_path: Path, device: torch.device) -> tuple[str, nn.Module, DictConfig, int]:
