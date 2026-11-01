@@ -19,6 +19,7 @@ Protocol (keep it identical everywhere, or numbers are not comparable):
   50k-sample FIDs reported in most papers. Compare only numbers computed with this script.
 
 Run:  uv run python -m src.eval_fid --ckpt runs/vae_cifar10/last.pt --n 10000
+      uv run python -m src.eval_fid --ckpt runs/ddpm_cifar10/last.pt --sampler ddim --steps 50
 """
 
 import argparse
@@ -31,7 +32,7 @@ import torch_fidelity
 from torch.utils.data import Dataset
 
 from src.data import get_dataset
-from src.sample import generate, load_model
+from src.sample import DDPM_SAMPLERS, Sampler, generate, get_sampler, load_model, sample_suffix
 from src.utils import seed_everything, to_unit
 
 FEATURE_EXTRACTOR = "inception-v3-compat"
@@ -75,14 +76,14 @@ def compute_fid(generated: torch.Tensor, dataset: str, resolution: int) -> float
 
 @torch.no_grad()
 def sample_uint8(
-    kind: str, model: torch.nn.Module, n: int, batch_size: int, seed: int, steps: int | None
+    sampler: Sampler, model: torch.nn.Module, n: int, batch_size: int, seed: int, steps: int | None
 ) -> tuple[torch.Tensor, int, float, float]:
     """Generate n images. Returns (uint8 images, NFE, seconds, peak GPU GB) for the cost table."""
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.synchronize()
     start = time.time()
     chunks, nfe = [], 0
-    for x, nfe in generate(kind, model, n, batch_size, seed, steps):
+    for x, nfe in generate(sampler, model, n, batch_size, seed, steps):
         chunks.append(to_uint8(x).cpu())
     torch.cuda.synchronize()
     seconds = time.time() - start
@@ -94,14 +95,18 @@ def main() -> None:
     parser.add_argument("--ckpt", type=Path, required=True)
     parser.add_argument("--n", type=int, default=10000)
     parser.add_argument("--batch-size", type=int, default=500)
-    parser.add_argument("--steps", type=int, default=None, help="sampler steps (FM / DDPM)")
+    parser.add_argument("--steps", type=int, default=None, help="sampler steps (FM / DDIM)")
+    parser.add_argument("--sampler", choices=DDPM_SAMPLERS, default=None, help="DDPM only")
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
     seed_everything(args.seed)
     kind, model, cfg, step = load_model(args.ckpt, torch.device("cuda"))
+    if kind == "ddpm" and args.sampler is None:
+        args.sampler = "ancestral"  # explicit, so output names and logs say which sampler
+    sampler = get_sampler(kind, cfg, args.sampler)
     images, nfe, seconds, peak_gb = sample_uint8(
-        kind, model, args.n, args.batch_size, args.seed, args.steps
+        sampler, model, args.n, args.batch_size, args.seed, args.steps
     )
     fid = compute_fid(images, cfg.data.dataset, cfg.data.resolution)
 
@@ -113,6 +118,7 @@ def main() -> None:
         "resolution": cfg.data.resolution,
         "n": args.n,
         "seed": args.seed,
+        "sampler": args.sampler,
         "steps": args.steps,
         "nfe": nfe,
         "batch_size": args.batch_size,
@@ -121,7 +127,7 @@ def main() -> None:
         "fid_impl": f"torch-fidelity {torch_fidelity.__version__} ({FEATURE_EXTRACTOR})",
     }
     print(json.dumps(result, indent=2))
-    suffix = "" if args.steps is None else f"_steps{args.steps}"
+    suffix = sample_suffix(args.sampler, args.steps)
     out = args.ckpt.parent / f"fid_n{args.n}{suffix}.json"
     out.write_text(json.dumps(result, indent=2) + "\n")
     print(f"saved {out}")
