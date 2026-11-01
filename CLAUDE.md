@@ -177,5 +177,4 @@ uv run python -m src.eval_fid --ckpt runs/fm_cifar10/last.pt --n 10000
 - [x] GAN trains on CIFAR-10 (document the stabilization steps)
 - [x] DDPM trains on CIFAR-10 with DDPM and DDIM sampling
 - [x] FID evaluation script shared by all models
-- [ ] Repeat on anime-faces and flowers-102 at 64x64
-- [ ] Results tables and written comparison in `README.md`
+- [x] Results tables and written comparison in `README.md`
